@@ -5,104 +5,44 @@
 #include <bitset>
 #include <thread>
 #include <mutex>
+#include <utility>
+#include <format>
 
 #define BYTE(x) std::bitset<8>(x)
 
 namespace Engine
 {
-    HGT::HGT() {
-    };
-    
-    std::mutex hgtMutex;
-    void HGT::interp_buffer_and_load(const std::vector<uint8_t>& buffer, const std::string& tile) {
-        const unsigned int HGT_INT_WIDTH = 2;
-        const unsigned int GRID_SIZE = 1201;
-        float angularStep = 1.0f / ((float)GRID_SIZE);
-
-        // parse tile
-        float latitudeBase = std::stof(tile.substr(1, 2)) * (tile[0] == 'N' ? 1.0f : -1.0f);
-        float longtitudeBase = std::stof(tile.substr(4, 3)) * (tile[3] == 'E' ? 1.0f : -1.0f);
-
-        std::vector<HGTSample> localSamples;
-
-        for (int i = 0; i<GRID_SIZE; i++) {
-            for (int j = 0; j<GRID_SIZE; j++) {
-                if (i % 2 != 0 || j % 2 != 0) continue;
-                unsigned int offset = HGT_INT_WIDTH * GRID_SIZE * i + HGT_INT_WIDTH * j;
-                unsigned int highByte = buffer[offset];
-                unsigned int lowByte = buffer[offset+1];
-
-                int16_t altitude = ((uint16_t)highByte << 8) | lowByte;
-
-                localSamples.push_back(HGTSample{
-                    .longitude = longtitudeBase + (1.0f - angularStep * ((float)i)),
-                    .latitude = latitudeBase + angularStep * ((float)j),
-                    .altitude = altitude
-                });
-            }
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(hgtMutex);
-            this->sampleBuffers[tile] = std::move(localSamples);
-        }
-
-        std::cout << "Finished block " << tile << "\n";
-    };
-
-    void workerTask0(HGT* hgt, std::vector<uint8_t> buffer, std::string tile) {
-        hgt->interp_buffer_and_load(buffer, tile);
-    }
+    HGT::HGT() {};
 
     HGT* HGT::fromDataSource(const std::string& path) {
-        HGT* hgt = new HGT();
-        std::vector<std::thread> threads;
-        
+        HGT* hgt = new HGT();        
         try {
             if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path)) {
                 std::cerr << "Katalog nie istnieje: " << path << std::endl;
                 return nullptr;
             }
-            ssize_t file_count = 0;
             for (const auto& entry : std::filesystem::directory_iterator(path)) {
                 if (entry.is_regular_file() && entry.path().extension() == ".hgt") {
-                    std::ifstream file(entry.path(), std::ios::binary | std::ios::ate);
-                    auto fileSize = file.tellg();
-                    file.seekg(0, std::ios::beg);
-                    std::vector<uint8_t> buffer(fileSize);
-                    if (!file.read(reinterpret_cast<char*>(buffer.data()), fileSize)) {
-                        throw std::runtime_error("Błąd odczytu: " + path);
-                    }
-                    // hgt->interp_buffer_and_load(buffer, entry.path().stem());
-                    threads.emplace_back(workerTask0, hgt, std::move(buffer), entry.path().stem());
-                    file_count++;
-                    if (file_count > 1000) break;
+                    hgt->tiles[entry.path().stem()] = HGTTile::buildFrom(entry.path(), hgt);
                 } 
             }
-
         } catch (const std::exception& e) {
             std::cerr << "Błąd ogólny: " << e.what() << std::endl;
-        }
-
-        for (auto& thread : threads) {
-            if (thread.joinable()) thread.join();
         }
         return hgt;
     };
 
-    std::mutex hgtTileMutex;
-    void workerTask1(
-        std::unordered_map<std::string, Engine::HGTTile *> &tiles, 
-        const std::vector<Engine::HGTSample>& samples, 
-        const std::string &tile
-    ) {
-        auto t = HGTTile::buildFrom(samples);
+    std::mutex isRunningMutex;
+    std::unordered_map<HGTTile*, bool> isRunning;
+    std::unordered_map<int, bool> isThreadRunning;
+
+    void loaderTask(HGTTile *tile, glm::vec3 position, int threadId) {
+        tile->loadLODFromPlayerPosition(position);
         {
-            std::lock_guard<std::mutex> lock(hgtTileMutex);
-            tiles[tile] = t;
+            std::lock_guard<std::mutex> lock(isRunningMutex);
+            isThreadRunning[threadId] = false;
         }
-        std::cout << "Build: " << tile << "\n";
-    } 
+    }
 
     void HGT::render_init(SceneContext *sceneContext) {
         // Prepare shaders
@@ -110,22 +50,54 @@ namespace Engine
             .isTransparent = false,
             .hasGeometryShader = false
         });
-
-        std::vector<std::thread> threads;
-        for (auto& buffer : this->sampleBuffers) {
-            threads.emplace_back(workerTask1, std::ref(this->tiles), std::cref(buffer.second), buffer.first);
-        }
-
-        for (auto& thread : threads) {
-            if (thread.joinable()) thread.join();
-        }
-
-        for (auto& tile : this->tiles) {
-            tile.second->buildGpuBuffers();
-        }
     };
 
+    int32_t getThreadIdx(HGTTile *tile) {
+        static int32_t last = 0;
+        static std::unordered_map<HGTTile*, int32_t> ptr;
+        if (ptr.contains(tile)) return ptr[tile];
+        last = (last + 1) % 8;
+        ptr[tile] = last;
+        return last;
+    }
+    
+    void scheduleLodLoading(HGTTile *tile, glm::vec3 position) {
+        // std::cout << "Czy moge zeschedulowac wczytywanie?\n";
+        int32_t idx = getThreadIdx(tile);
+        std::lock_guard<std::mutex> lock(isRunningMutex);
+        if (isThreadRunning.find(idx) != isThreadRunning.end() && isThreadRunning[idx]) {
+            // std::cout << "Nie moge : (\n";
+            return;
+        }
+        isThreadRunning[idx] = true;
+        // std::cout << "tak, ladujemy do tile'a: " << tile << "\n";
+        std::thread(loaderTask, tile, position, idx).detach();
+    }
+
+    glm::ivec2 HGT::get_tile_on_top() {
+        auto p = glm::inverse(this->transform.getRotation()) * glm::vec3(0.0f, 1.0f, 0.0f);
+        return {
+            (int)glm::floor(glm::degrees(std::asin(p.y))),
+            (int)glm::floor(glm::degrees(std::atan2(p.z, p.x)))
+        };
+    }; 
+
+    std::string HGT::ivec2_to_tile_name(const glm::ivec2& vec) {
+        char ns = vec.x > 0 ? 'N' : 'S';
+        char ew = vec.y > 0 ? 'E' : 'W';
+        return std::format(
+            "{}{}{}{}{}{}", 
+            ns, 
+            glm::abs(vec.x) < 10 ? "0" : "",
+            glm::abs(vec.x), 
+            ew,
+            glm::abs(vec.y) < 100 ? glm::abs(vec.y) < 10 ? "00" : "0" : "",
+            glm::abs(vec.y)
+        );
+    }
+
     void HGT::render(RendererContext *context) {
+        static int rendersLeftBeforeTileSort = 1000;
         // bind shaders
         // ...
         context->shaderRepository->useShaderWithDataByID(this->shaderID, {}, {});
@@ -133,10 +105,32 @@ namespace Engine
         context->shaderRepository->setUniformMat4("view", context->view);
         context->shaderRepository->setUniformMat4("model", this->transform.getModelMatrix());
         context->shaderRepository->setUniformVec3("viewPos", context->cameraPosition);
-
+        
+        // retrieve tile from position
+        glm::ivec2 topTile = this->get_tile_on_top();
+        std::vector<glm::ivec2> nbrs = {
+            topTile,
+            topTile - glm::ivec2(0, 1),
+            topTile - glm::ivec2(0, -1),
+            topTile - glm::ivec2(1, 0),
+            topTile - glm::ivec2(-1, 0),
+            topTile - glm::ivec2(1, 1),
+            topTile - glm::ivec2(1, -1),
+            topTile - glm::ivec2(-1, 1),
+            topTile - glm::ivec2(-1, -1),
+        };
         // bind and draw
-        for (auto tile : this->tiles) {
-            tile.second->bindAndRender();
+        for (auto nbr : nbrs) {
+            auto tileName = ivec2_to_tile_name(nbr);
+            if (!this->tiles.contains(tileName)) {
+                this->tiles[tileName] = HGTTile::buildPlaneAt(nbr, this);
+            };
+            auto tile = this->tiles[tileName];
+
+            scheduleLodLoading(tile, context->cameraPosition);
+            tile->runPendingTransfers();
+            tile->runGarbageCollector();
+            if (!tile->bindAndRender()) break;
         }
     };
 };

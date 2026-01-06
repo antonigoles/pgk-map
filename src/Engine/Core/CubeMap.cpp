@@ -6,7 +6,8 @@
 #include <iostream>
 
 namespace Engine {
-	CubeMap::CubeMap(unsigned int gl_cubemapID) : gl_cubemapID(gl_cubemapID) {};
+	CubeMap::CubeMap(unsigned int gl_cubemapID) : gl_cubemapID(gl_cubemapID), availableUnderIndex(-1) {
+	};
 
 	CubeMap* CubeMap::createFromPathPattern(const std::string& pattern, CubeMapLoaderOptions options) {
 		// we exepect to find "{face}" clause in the pattern string

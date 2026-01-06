@@ -16,13 +16,13 @@ namespace Engine {
 	};
 
 	int Texture::bindTexture() { // auto binding
-		static int lastBind = 8; // 8 textures and 8 cubemaps
-		if(this->availableUnderIndex==-1) {
-			glActiveTexture(GL_TEXTURE0 + lastBind);
-			glBindTexture(GL_TEXTURE_2D, this->gl_texture);
-			this->availableUnderIndex = lastBind;
-			lastBind++;
-		}
+		// static int lastBind = 8; // 8 textures and 8 cubemaps
+		// if(this->availableUnderIndex==-1) {
+		glActiveTexture(GL_TEXTURE8);
+		glBindTexture(GL_TEXTURE_2D, this->gl_texture);
+		this->availableUnderIndex = 8;
+			// lastBind++;
+		// }
 		return this->availableUnderIndex;
 	}
 

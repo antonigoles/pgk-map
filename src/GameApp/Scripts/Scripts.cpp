@@ -5,12 +5,24 @@
 #include <Engine/Support/FpsCamera.hpp>
 #include <Engine/Core/Scene/SceneContext.hpp>
 #include <iostream>
+#include <Engine/Support/HGT/HGT.hpp>
 
 namespace GameApp
 {
 	void cameraControlScript(Engine::UpdateFunctionData data) {
+		static float angularSpeed = 0.001f;
+
 		Engine::FpsCamera* camera = static_cast<Engine::FpsCamera*>(static_cast<Engine::Updateable*>(data.sourcePointer));
 		auto window = data.sceneContext->glfwWindow;
+
+		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+			angularSpeed += 0.001f;
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+			angularSpeed -= 0.001f;
+		}
+
 		glm::vec3 translation = {0,0,0};
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
 			translation += camera->getForward();
@@ -28,18 +40,35 @@ namespace GameApp
 			translation += camera->getRight();
 		}
 
+		translation.y = 0.0;
+
+		if (glm::length2(translation) > 0.0) {
+			translation = glm::normalize(translation);
+
+			// calculate angular rotation on 
+			Engine::HGT* hgt = (Engine::HGT*)camera->get_ref("hgt");
+			glm::vec3 cross = glm::cross(translation, glm::vec3(0.0f, 1.0f, 0.0f)); 
+
+			hgt->transform.setRotation(
+				glm::normalize(
+					glm::angleAxis(data.deltaTime * angularSpeed * (camera->transform.getPosition().y / hgt->transform.getScale().x), cross) 
+					* hgt->transform.getRotation()
+				)
+			);
+		}
+
+		glm::vec3 dy = glm::vec3(0.0, 0.0, 0.0);
+
 		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-			translation += glm::vec3{0, 1.0f, 0};
+			dy += glm::vec3{0, 1.0f, 0};
 		}
 
 		if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-			translation -= glm::vec3{0, 1.0f, 0};
+			dy -= glm::vec3{0, 1.0f, 0};
 		}
 
-		translation = glm::length2(translation) == 0.0f ? translation : glm::normalize(translation) * 0.1f;
-
 		camera->transform.setPosition(
-			camera->transform.getPosition() + translation * data.deltaTime
+			camera->transform.getPosition() + dy * 50.0f * data.deltaTime
 		);
 	}
 }

@@ -409,7 +409,7 @@ namespace Engine {
         Engine::GlobalProfiler::openNewSection("Projection matrix calculation");
         glm::mat4 projection = glm::perspective(
             glm::radians(this->sceneContext.camera->getFOV() / 2.0f), 
-            ((float)this->v_width) / ((float)this->v_height), 0.01f, 550.0f
+            ((float)this->v_width) / ((float)this->v_height), 0.01f, 2250.0f
         );
         Engine::GlobalProfiler::closeLastSection();
 

@@ -72,7 +72,8 @@ namespace Engine
             glfwSetScrollCallback(window, scroll_callback);
         }
 
-        this->distance = std::min(15.0f, std::max(this->distance - scroll_dy, 1.0f));
+        float scrollSensitivity = 0.1f;
+        this->distance = std::min(15.0f, std::max(this->distance - scroll_dy * scrollSensitivity, 1.0f));
 
         float dx = (this->lastXpos - xpos);
         float dy = (this->lastYpos - ypos);

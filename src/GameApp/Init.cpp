@@ -1,7 +1,7 @@
 #include <Engine/Core/Scene/GameObject.hpp>
 #include <Engine/Core/Scene/GameObjectCluster.hpp>
-#include "Engine/Core/Colisions.hpp"
-#include "Engine/Core/Math/Math.hpp"
+#include <Engine/Core/Colisions.hpp>
+#include <Engine/Core/Math/Math.hpp>
 #include "Engine/Core/Rendering/Layers.hpp"
 #include "Engine/Support/TpsCamera.hpp"
 #include "glm/ext/quaternion_geometric.hpp"
@@ -32,7 +32,7 @@ namespace GameApp
         Engine::Camera* camera = new Engine::TpsCamera(90.0f);
 
         scene->setCamera(camera);
-        camera->transform.setPosition({0.0f, 1.0f, 0.0f});
+        camera->transform.setPosition({0.0f, 500.0f, 0.0f});
         // camera->transform.setRotation(glm::angleAxis(3.14f / 4.0f, glm::vec3{1, 0, 0}));
 
         auto meshRepository = application->getComponent<Engine::MeshRepository>();
@@ -52,7 +52,7 @@ namespace GameApp
         cloud1->transform.setScale({1.0f, 1.0f, 1.0f});
         cloud1->label = "cloud";
 
-        camera->syncCameraAndTarget(cloud1->transform);
+        // camera->syncCameraAndTarget(cloud1->transform);
 
         scene->setFlag(Engine::SCENE_FLAGS::RENDER_DEBUG_UI);
 
@@ -72,7 +72,7 @@ namespace GameApp
         camera->registerUpdateFunction(GameApp::cameraControlScript);
 
         scene->setCamera(camera);
-        camera->transform.setPosition({0.0f, 1.0f, 0.0f});
+        camera->transform.setPosition({0, 100050.0f, 0});
 
         auto meshRepository = application->getComponent<Engine::MeshRepository>();
         auto shaderRepository = application->getComponent<Engine::ShaderRepository>();
@@ -83,16 +83,35 @@ namespace GameApp
         textureRepository->loadEmptyTexture("./assets/textures/notexture.png");
 
         // load HGT
-        Engine::HGT* hgt = Engine::HGT::fromDataSource("./assets/M33");
+        Engine::HGT* hgt = Engine::HGT::fromDataSource("/mnt/d6e94da6-c1d5-4615-9695-ec204b9e3102/pgk-map/hgt_gigant");
+        // Engine::HGT* hgt = Engine::HGT::fromDataSource("./assets/M33");
         scene->addRenderable(hgt);
+        camera->set_ref("hgt", hgt);
+
+        auto up = glm::vec3(0.0f, 1.0f, 0.0f);
+
+        auto sleza = glm::vec2(50.86501694, 16.70881694);
+        auto dolnyslask = glm::vec2(51.0, 17.0f);
+
+        auto dir = glm::normalize(Engine::Math::angleToEarthPoint(sleza.x, 0.0, sleza.y));
+
+        // std::cout << "================== roty\n";
+        std::cout << glm::orientedAngle(up, dir, up) << "\n";
+        // std::cout << dir.x << " " << dir.y << " " << dir.z << "\n";
 
         hgt->transform.setRotation(
-            glm::normalize(glm::angleAxis(
-                glm::radians(90.0f), glm::vec3{0.0f, 0.0f, 1.0f}
-            ))
+            glm::normalize(
+                glm::angleAxis(
+                    -glm::orientedAngle(up, dir, up), 
+                    glm::normalize(glm::cross(up, dir))
+                )
+            )
         );
 
-         auto cloudShader = shaderRepository->shaderProgramFromDirectory("./assets/shaders/universal", { 
+        hgt->transform.setScale(100000.0f);
+        hgt->transform.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
+        auto cloudShader = shaderRepository->shaderProgramFromDirectory("./assets/shaders/universal", { 
             .isTransparent = false,
             .hasGeometryShader = false,
         });

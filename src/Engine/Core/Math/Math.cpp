@@ -37,6 +37,17 @@ namespace Engine::Math
         return glm::normalize(smoothRot);
     }
 
+    glm::vec3 angleToEarthPoint(float latitude, float altitude, float longitude) {
+        const float earth_radius = 6371000.0f; // meters
+        float radius = altitude + earth_radius;
+        float latRad = glm::radians(latitude);
+        float lonRad = glm::radians(longitude);
+        float x = radius * cos(latRad) * cos(lonRad);
+        float y = radius * sin(latRad);
+        float z = radius * cos(latRad) * sin(lonRad);
+        return glm::vec3(x, y, z);
+    };
+
     float getRandom(float min, float max) {
         static std::random_device rd;  // Źródło entropii (używane tylko raz)
         static std::mt19937 gen(seed); // Generator Mersenne Twister
