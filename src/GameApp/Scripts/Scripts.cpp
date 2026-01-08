@@ -11,17 +11,27 @@ namespace GameApp
 {
 	void cameraControlScript(Engine::UpdateFunctionData data) {
 		static float angularSpeed = 0.001f;
+		static float verticalSpeed = 50.0f;
+		static bool noRepeatLock_UP = false;
+		static bool noRepeatLock_DOWN = false;
 
 		Engine::FpsCamera* camera = static_cast<Engine::FpsCamera*>(static_cast<Engine::Updateable*>(data.sourcePointer));
 		auto window = data.sceneContext->glfwWindow;
 
-		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS && !noRepeatLock_UP) {
 			angularSpeed += 0.001f;
+			verticalSpeed += 15.0f;
+			noRepeatLock_UP = true;
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-			angularSpeed -= 0.001f;
+		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS && !noRepeatLock_DOWN) {
+			angularSpeed = std::max(0.001f, angularSpeed - 0.001f);
+			verticalSpeed = std::max(50.0f, verticalSpeed - 15.0f);
+			noRepeatLock_DOWN = true;
 		}
+
+		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_RELEASE) noRepeatLock_UP = false;
+		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_RELEASE) noRepeatLock_DOWN = false;
 
 		glm::vec3 translation = {0,0,0};
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
@@ -68,7 +78,7 @@ namespace GameApp
 		}
 
 		camera->transform.setPosition(
-			camera->transform.getPosition() + dy * 50.0f * data.deltaTime
+			camera->transform.getPosition() + dy * verticalSpeed * data.deltaTime
 		);
 	}
 }

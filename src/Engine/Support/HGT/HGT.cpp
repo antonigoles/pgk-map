@@ -7,6 +7,7 @@
 #include <mutex>
 #include <utility>
 #include <format>
+#include <Engine/Core/Scene/Camera.hpp>
 
 #define BYTE(x) std::bitset<8>(x)
 
@@ -29,6 +30,7 @@ namespace Engine
         } catch (const std::exception& e) {
             std::cerr << "Błąd ogólny: " << e.what() << std::endl;
         }
+        std::cout << "partially-loaded " << hgt->tiles.size() << " tiles into memory\n";
         return hgt;
     };
 
@@ -56,7 +58,7 @@ namespace Engine
         static int32_t last = 0;
         static std::unordered_map<HGTTile*, int32_t> ptr;
         if (ptr.contains(tile)) return ptr[tile];
-        last = (last + 1) % 8;
+        last = (last + 1) % 1;
         ptr[tile] = last;
         return last;
     }
@@ -108,19 +110,25 @@ namespace Engine
         
         // retrieve tile from position
         glm::ivec2 topTile = this->get_tile_on_top();
-        std::vector<glm::ivec2> nbrs = {
-            topTile,
-            topTile - glm::ivec2(0, 1),
-            topTile - glm::ivec2(0, -1),
-            topTile - glm::ivec2(1, 0),
-            topTile - glm::ivec2(-1, 0),
-            topTile - glm::ivec2(1, 1),
-            topTile - glm::ivec2(1, -1),
-            topTile - glm::ivec2(-1, 1),
-            topTile - glm::ivec2(-1, -1),
-        };
+        std::vector<glm::ivec2> nbrs = {};
+
+        // generate tiles to draw
+        float distance = context->cameraPosition.y - 100000.0f;
+        float factor = 10000.0f;
+
+        int square_size_x = 1 + (int)(4.0f * distance / factor);
+        int square_size_y = 1 + 2 * (int)(4.0f * distance / factor);
+
+
+        for (int dy = square_size_y; dy >= -square_size_y; dy--) {
+            for (int dx = -square_size_x; dx <= square_size_x; dx++) {
+                nbrs.push_back(topTile + glm::ivec2(dx, dy));
+            }
+        }
+
         // bind and draw
-        for (auto nbr : nbrs) {
+        for (int i = 0; i<nbrs.size(); i++) {
+            auto nbr = nbrs[i];
             auto tileName = ivec2_to_tile_name(nbr);
             if (!this->tiles.contains(tileName)) {
                 this->tiles[tileName] = HGTTile::buildPlaneAt(nbr, this);
@@ -130,7 +138,8 @@ namespace Engine
             scheduleLodLoading(tile, context->cameraPosition);
             tile->runPendingTransfers();
             tile->runGarbageCollector();
-            if (!tile->bindAndRender()) break;
+            float lod = (float)tile->getLod();
+            tile->bindAndRender();
         }
     };
 };

@@ -56,7 +56,7 @@ namespace Engine
         std::vector<float> vertices_buffer_cache;
         std::vector<uint32_t> indices_buffer_cache;
     public:
-        HGTLOD LOD;
+        int LOD;
 
         bool pendingTransfer;
 
@@ -70,7 +70,7 @@ namespace Engine
         static std::unique_ptr<HGTTileMesh> build(
             const std::vector<float>& vertices_buffer, 
             const std::vector<uint32_t>& indices_buffer,
-            HGTLOD LOD
+            int LOD
         );
     };
 
@@ -85,11 +85,11 @@ namespace Engine
 
         std::string path;
 
-        HGTLOD lastLOD;
+        int lastLOD;
 
         HGT* parent;
 
-        HGTLOD getLodFromPosition(glm::vec3 position);
+        int getLodFromPosition(glm::vec3 position);
 
         void loadLODFromPlayerPositionInternal(glm::vec3 position);
     public:
@@ -97,7 +97,7 @@ namespace Engine
 
         HGTTile(HGT* parent);
 
-        HGTLOD getLod();
+        int getLod();
 
         bool bindAndRender();
 
@@ -117,7 +117,6 @@ namespace Engine
     class HGT : public Renderable {
     private:
         unsigned int shaderID;
-
     public:
         std::unordered_map<std::string, HGTTile*> tiles; // a tile is usually a single file (1x1 degrees^2)
         std::vector<HGTTile*> tilesSorted;

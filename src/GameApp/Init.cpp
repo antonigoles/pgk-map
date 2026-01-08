@@ -65,7 +65,7 @@ namespace GameApp
         scene->setSkybox(skybox);
     }
 
-    void setupGameScene(Engine::Application *application, Engine ::Scene* scene) {
+    void setupGameScene(Engine::Application *application, Engine ::Scene* scene, float startLongtitude, float startLatitude) {
         application->setScene(scene);
 
         Engine::FpsCamera* camera = new Engine::FpsCamera(90.0f);
@@ -80,6 +80,13 @@ namespace GameApp
         auto gameObjectClusterRepository = scene->getComponent<Engine::GameObjectClusterRepository>();
         auto textureRepository = application->getComponent<Engine::TextureRepository>();
 
+        auto screenShader = shaderRepository->shaderProgramFromDirectory("./assets/shaders/screen", { 
+            .isTransparent = false,
+            .hasGeometryShader = false,
+        });
+
+        application->setScreenShader(screenShader);
+
         textureRepository->loadEmptyTexture("./assets/textures/notexture.png");
 
         // load HGT
@@ -93,7 +100,9 @@ namespace GameApp
         auto sleza = glm::vec2(50.86501694, 16.70881694);
         auto dolnyslask = glm::vec2(51.0, 17.0f);
 
-        auto dir = glm::normalize(Engine::Math::angleToEarthPoint(sleza.x, 0.0, sleza.y));
+        auto custom = glm::vec2(startLongtitude, startLatitude);
+
+        auto dir = glm::normalize(Engine::Math::angleToEarthPoint(custom.x, 0.0, custom.y));
 
         // std::cout << "================== roty\n";
         std::cout << glm::orientedAngle(up, dir, up) << "\n";
@@ -129,11 +138,12 @@ namespace GameApp
             .isTransparent = false,
             .hasGeometryShader = false
         });
-        auto skybox = Engine::SkyBox::createFromPathPattern("./assets/skyboxes/pack/20250717_210621_0774_{face}.png", skyboxDefaultShader);
+        auto skybox = Engine::SkyBox::createFromPathPattern("./assets/skyboxes/black_{face}.png", skyboxDefaultShader);
+        // auto skybox = Engine::SkyBox::createFromPathPattern("./assets/skyboxes/pack/20250717_210621_0774_{face}.png", skyboxDefaultShader);
         scene->setSkybox(skybox);
     }
 
-    void init() {
+    void init(float startLongtitude, float startLatitude) {
         Engine::Application application = Engine::Application(
             Engine::ApplicationSettings{
                 .profilerSettings = {
@@ -151,7 +161,7 @@ namespace GameApp
         // setupDebugScene(&application, debugScene);
 
         Engine::Scene* debugScene = application.createScene("GameScene");
-        setupGameScene(&application, debugScene);
+        setupGameScene(&application, debugScene, startLongtitude, startLatitude);
 
         application.run();
     };

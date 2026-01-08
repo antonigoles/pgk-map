@@ -1,5 +1,6 @@
 #pragma once
 #include <Engine/Core/ShaderRepository.hpp>
+#include <Engine/Core/Scene/Camera.hpp>
 
 namespace Engine {
 	class RendererContext {
@@ -9,5 +10,6 @@ namespace Engine {
 	        glm::vec3 cameraPosition;
 
 			ShaderRepository* shaderRepository;
+			Camera* camera;
 	};
 }

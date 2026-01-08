@@ -2,5 +2,5 @@
 
 namespace GameApp
 {
-    void init();
+    void init(float startLongtitude, float startLatitude);
 };

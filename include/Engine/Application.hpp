@@ -37,6 +37,8 @@ namespace Engine {
 
     class Application {
     private:
+        unsigned int fbo, colorTexture, depthTexture, screenShader;
+
         ApplicationContext applicationContext;
 
         void checkFrameBufferSizeEvent();
@@ -47,8 +49,11 @@ namespace Engine {
         Application(ApplicationSettings&& settings);
 
         void makeGlfwWindow();
+        void createFBO(int width, int height);
         void setScene(Scene *scene);
         void run();
+
+        void setScreenShader(unsigned int screenShader);
 
         Scene* createScene(std::string &&name);
         

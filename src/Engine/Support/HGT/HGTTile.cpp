@@ -17,46 +17,59 @@ namespace Engine
     HGTTile::HGTTile(HGT* parent) {
         this->parent = parent;
         this->currentMesh = nullptr;
+        this->isPermaPlane = false;
     };
     
     bool HGTTile::bindAndRender() {
         std::unique_lock<std::mutex> lock(currentMeshMutex);
-        if (!this->currentMesh || this->currentMesh->LOD == HGTLOD::PLANE) {
+        if (!this->currentMesh) {
             return false;
         }
         this->currentMesh->render();
         return true;
     };
 
-    HGTLOD HGTTile::getLod() {
+    int HGTTile::getLod() {
         std::unique_lock<std::mutex> lock(currentMeshMutex);
         return this->currentMesh ? this->currentMesh->LOD : HGTLOD::PLANE;
     };
 
-    float LOD_MARGINS::PLANE = 1.0f;
-    float LOD_MARGINS::VERY_LOW = 0.9f;
-    float LOD_MARGINS::LOW = 0.6f;
-    float LOD_MARGINS::MEDIUM = 0.7f;
-    float LOD_MARGINS::HIGH = 0.6f;
-    float LOD_MARGINS::VERY_HIGH = 0.5f;
+    float LOD_MARGINS::PLANE = 10.6f;
+    float LOD_MARGINS::VERY_LOW = 5.5f;
+    float LOD_MARGINS::LOW = 2.4f;
+    float LOD_MARGINS::MEDIUM = 1.3f;
+    float LOD_MARGINS::HIGH = 0.2f;
+    float LOD_MARGINS::VERY_HIGH = 0.1f;
 
-    HGTLOD HGTTile::getLodFromPosition(glm::vec3 position) {
+    // diviros of 1200
+    std::vector<int> divisorsOf1200 = {
+        1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 25, 30, 40, 48, 50, 60, 75, 80, 100, 120, 150, 200, 240, 300, 400, 600, 1200
+    };
+
+    int HGTTile::getLodFromPosition(glm::vec3 position) {
         if (this->isPermaPlane) return HGTLOD::PLANE;
-        float distance = glm::length(position - glm::vec3(this->parent->transform.getModelMatrix() * glm::vec4(center, 1.0f)));
-        float factor = glm::length(this->parent->transform.getScale());
+        float distance = position.y - 100000.0f;
+        float factor = 10000.0f;
 
-        // we should fine tune this
-        if (distance > factor * LOD_MARGINS::PLANE) return HGTLOD::PLANE;
-        if (distance > factor * LOD_MARGINS::VERY_LOW) return HGTLOD::VERY_LOW;
-        if (distance > factor * LOD_MARGINS::LOW) return HGTLOD::LOW;
-        if (distance > factor * LOD_MARGINS::MEDIUM) return HGTLOD::MEDIUM;
-        if (distance > factor * LOD_MARGINS::HIGH) return HGTLOD::HIGH;
-        if (distance > factor * LOD_MARGINS::VERY_HIGH) return HGTLOD::VERY_HIGH;
-        return HGTLOD::PERFECT;
+        
+        // if (distance > factor * LOD_MARGINS::PLANE) return HGTLOD::PLANE;
+        // if (distance > factor * LOD_MARGINS::VERY_LOW) return HGTLOD::VERY_LOW;
+        // if (distance > factor * LOD_MARGINS::LOW) return HGTLOD::LOW;
+        // if (distance > factor * LOD_MARGINS::MEDIUM) return HGTLOD::MEDIUM;
+        // if (distance > factor * LOD_MARGINS::HIGH) return HGTLOD::HIGH;
+        // if (distance > factor * LOD_MARGINS::VERY_HIGH) return HGTLOD::VERY_HIGH;
+        // return HGTLOD::VERY_LOW;
+
+        // continoous LOD
+        int max = divisorsOf1200.size() - 1;
+        int LOD = std::min(max, std::max(0, (int)(12.0f * distance / factor)));
+
+        return divisorsOf1200[LOD];
     };
 
     void HGTTile::runGarbageCollector() {
-        std::unique_lock<std::mutex> lock(currentMeshMutex);
+        std::unique_lock<std::mutex> lock1(currentMeshMutex);
+        std::unique_lock<std::mutex> lock2(indicesCountMutex);
         if (this->currentMesh && this->currentMesh->LOD == HGTLOD::PLANE) {
             // clean everything else
             this->meshQueue.clear();
@@ -111,9 +124,16 @@ namespace Engine
         float longtitudeBase = std::stof(tile_name.substr(4, 3)) * (tile_name[3] == 'E' ? 1.0f : -1.0f);
 
         uint32_t FILE_GRID_SIZE = this->isPermaPlane ? 2 : 1201;
-        uint32_t EFFECTIVE_GRID_SIZE = this->isPermaPlane ? 2 : (1200/LOD) + 1;
+        uint32_t EFFECTIVE_GRID_SIZE = this->isPermaPlane ? 2 : (FILE_GRID_SIZE-1) / LOD + 1;
         LOD = this->isPermaPlane ? HGTLOD::PERFECT : LOD;
         uint32_t HGT_INT_WIDTH = 2;
+
+        float sumSoFar = 0.0;
+
+        assert((FILE_GRID_SIZE-1) % LOD == 0);
+
+        std::vector<int> holesToFill;
+        float properCount = 0;
 
         for (int i = 0; i<FILE_GRID_SIZE; i+=LOD) {
             for (int j = 0; j<FILE_GRID_SIZE; j+=LOD) {
@@ -122,6 +142,14 @@ namespace Engine
                 unsigned int lowByte = buffer[buffer_offset+1];
 
                 int16_t altitude = (((uint16_t)highByte << 8) | lowByte);
+            
+
+                if (altitude > (int16_t)-1000) {
+                    sumSoFar += (float)altitude;
+                    properCount += 1.0f;
+                } else {
+                    holesToFill.push_back( vertices_buffer.size() + 1 );
+                }
 
                 float latProgress = (float)i / (float)(FILE_GRID_SIZE - 1);
                 float latitude = (latitudeBase + 1.0f) - (latProgress * 1.0f); 
@@ -150,6 +178,8 @@ namespace Engine
                 });
             }
         }
+
+        std::cout << "Holes to fill: " << holesToFill.size() << "\n";
         
         this->center = (glm::vec3(vertices_buffer[0], vertices_buffer[1], vertices_buffer[2]) 
             + glm::vec3(vertices_buffer[vertices_buffer.size()-3], vertices_buffer[vertices_buffer.size()-2], vertices_buffer[vertices_buffer.size()-1])) / 2.0f;
@@ -224,7 +254,7 @@ namespace Engine
     std::unique_ptr<HGTTileMesh> HGTTileMesh::build(
         const std::vector<float>& vertices_buffer, 
         const std::vector<uint32_t>& indices_buffer,
-        HGTLOD LOD
+        int LOD
     ) {
         std::unique_ptr<HGTTileMesh> mesh = std::make_unique<HGTTileMesh>();
 

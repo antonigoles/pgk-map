@@ -73,11 +73,11 @@ namespace Engine
 
         float sensitivity = 0.07f;
 
-        float dx = (lastXpos - xpos);
-        float dy = (lastYpos - ypos);
+        double dx = (lastXpos - xpos);
+        double dy = (lastYpos - ypos);
 
         yaw = yaw + sensitivity * dx;
-        pitch = std::min(89.0f, std::max(-89.0f, pitch + sensitivity * dy));
+        pitch = (float)std::min(89.0, std::max(-89.0, pitch + sensitivity * dy));
 
         glm::quat sidewaysRotation = glm::angleAxis(
             glm::radians(yaw),

@@ -409,7 +409,7 @@ namespace Engine {
         Engine::GlobalProfiler::openNewSection("Projection matrix calculation");
         glm::mat4 projection = glm::perspective(
             glm::radians(this->sceneContext.camera->getFOV() / 2.0f), 
-            ((float)this->v_width) / ((float)this->v_height), 0.01f, 2250.0f
+            ((float)this->v_width) / ((float)this->v_height), 1255500.0f, 0.1f
         );
         Engine::GlobalProfiler::closeLastSection();
 
@@ -425,8 +425,25 @@ namespace Engine {
             .view = this->sceneContext.camera->getViewMatrix(),
             .projection = projection,
             .cameraPosition = this->sceneContext.camera->transform.getPosition(),
-            .shaderRepository = this->sceneContext.shaderRepository
+            .shaderRepository = this->sceneContext.shaderRepository,
+            .camera = this->sceneContext.camera
         };
+
+        if (this->skybox != nullptr && this->getLayerMask().matchWith(this->skybox->getLayerMask())) {
+            glDepthMask(GL_FALSE);
+            glDepthFunc(GL_ALWAYS);
+            shaderRepository->useShaderWithDataByID(this->skybox->getShader(), {}, {});
+            glm::mat4 view = glm::mat4(glm::mat3(this->sceneContext.camera->getViewMatrix()));
+            shaderRepository->setUniformMat4("projection", projection);
+            shaderRepository->setUniformMat4("view", view);
+            shaderRepository->setUniformInt("isSkybox", 1);
+            shaderRepository->setUniformVec3("cameraPosition", this->sceneContext.camera->transform.getPosition());
+            glBindVertexArray(this->skybox->getSkyboxVAO());
+            shaderRepository->setUniformInt("cubeMap", this->skybox->getCubeMap()->bind());
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDepthFunc(GL_GREATER);
+            glDepthMask(GL_TRUE);
+        }
 
         std::vector<unsigned int> transparentShaders;
         std::vector<unsigned int> nonTransparentShaders;
@@ -466,21 +483,7 @@ namespace Engine {
         // render renderables
         for (auto renderable : this->customRenderables) {
             renderable->render(rendererContext);
-        }
-
-        // draw skybox now
-        if (this->skybox != nullptr && this->getLayerMask().matchWith(this->skybox->getLayerMask())) {
-            glDepthFunc(GL_LEQUAL);
-            shaderRepository->useShaderWithDataByID(this->skybox->getShader(), {}, {});
-            glm::mat4 view = glm::mat4(glm::mat3(this->sceneContext.camera->getViewMatrix()));
-            shaderRepository->setUniformMat4("projection", projection);
-            shaderRepository->setUniformMat4("view", view);
-            shaderRepository->setUniformInt("isSkybox", 1);
-            glBindVertexArray(this->skybox->getSkyboxVAO());
-            shaderRepository->setUniformInt("cubeMap", this->skybox->getCubeMap()->bind());
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glDepthFunc(GL_LESS);
-        }
+        }        
 
         // Render transparent stuff
 

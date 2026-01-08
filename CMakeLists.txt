@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Application LANGUAGES CXX)
+project(Application LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,18 +28,6 @@ FetchContent_Declare(
     GIT_TAG latest
 )
 FetchContent_MakeAvailable(glfw)
-
-# --- GLAD ---
-FetchContent_Declare(
-    glad
-    GIT_REPOSITORY https://github.com/Dav1dde/glad.git
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(glad)
-
-set(GLAD_PROFILE "core")
-set(GLAD_API "gl=4.6")     
-set(GLAD_GENERATOR "c")
 
 # --- GLM ---
 FetchContent_Declare(
@@ -75,6 +63,16 @@ add_library(stb_image
 target_include_directories(stb_image PUBLIC
     external/stb_image/
 )
+
+# --- GLAD ---
+add_library(glad STATIC 
+    external/glad/src/gl.c
+)
+target_include_directories(glad PUBLIC external/glad/include)
+
+if (UNIX)
+    target_link_libraries(glad PRIVATE dl)
+endif()
 
 # --- Project sources ---
 

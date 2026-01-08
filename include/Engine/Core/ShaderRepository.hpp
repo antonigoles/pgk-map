@@ -1,8 +1,8 @@
 #pragma once
+#include <Engine/Core/OpenGL.hpp>
 #include <string>
 #include <glm/vec2.hpp>
 #include <unordered_map>
-#include <glad/glad.h>
 #include <Engine/Core/Misc/Types.hpp>
 
 namespace Engine {
