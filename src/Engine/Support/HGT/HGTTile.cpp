@@ -135,6 +135,8 @@ namespace Engine
         std::vector<int> holesToFill;
         float properCount = 0;
 
+        // idea: we should allways take border elements
+
         for (int i = 0; i<FILE_GRID_SIZE; i+=LOD) {
             for (int j = 0; j<FILE_GRID_SIZE; j+=LOD) {
                 unsigned int buffer_offset = HGT_INT_WIDTH * FILE_GRID_SIZE * i + HGT_INT_WIDTH * j;
@@ -142,14 +144,8 @@ namespace Engine
                 unsigned int lowByte = buffer[buffer_offset+1];
 
                 int16_t altitude = (((uint16_t)highByte << 8) | lowByte);
-            
 
-                if (altitude > (int16_t)-1000) {
-                    sumSoFar += (float)altitude;
-                    properCount += 1.0f;
-                } else {
-                    holesToFill.push_back( vertices_buffer.size() + 1 );
-                }
+                sumSoFar += (float)altitude;
 
                 float latProgress = (float)i / (float)(FILE_GRID_SIZE - 1);
                 float latitude = (latitudeBase + 1.0f) - (latProgress * 1.0f); 
@@ -177,6 +173,14 @@ namespace Engine
                     offset_a, offset_d, offset_c, offset_a, offset_b, offset_d
                 });
             }
+        }
+
+        // flatten the result depending on LOD
+
+        for (int i = 0; i<vertices_buffer.size(); i+=3) {
+            float average = sumSoFar / ((float)vertices_buffer.size() / 3.0f);
+            float t = (float)LOD / 1200.0; // how strong should we flatten
+            vertices_buffer[i+1] = glm::mix(vertices_buffer[i+1], average, t);
         }
 
         std::cout << "Holes to fill: " << holesToFill.size() << "\n";
