@@ -8,6 +8,7 @@
 #include <thread>
 #include <set>
 #include <Engine/Core/Math/Math.hpp>
+#include <stb_image.h>
 
 namespace Engine
 {
@@ -93,33 +94,14 @@ namespace Engine
         std::vector<float> vertices_buffer;
         std::vector<uint32_t> indices_buffer;
 
-        // 1. quick data load
-        std::vector<uint8_t> buffer;
-        if (!this->isPermaPlane) {
-            std::ifstream file(path, std::ios::binary | std::ios::ate);
-            auto fileSize = file.tellg();
-            file.seekg(0, std::ios::beg);
-            if (fileSize > std::vector<uint8_t>().max_size()) {
-                std::cout << "File too big?? " << fileSize << "\n";
-                return;
-            }
-            buffer = std::vector<uint8_t>(fileSize);
-            if (!file.read(reinterpret_cast<char*>(buffer.data()), fileSize)) {
-                throw std::runtime_error("Błąd odczytu: " + path);
-            }
-        }
-
-        buffer = {
-            (uint8_t)0,(uint8_t)0,(uint8_t)0,(uint8_t)0,
-            (uint8_t)0,(uint8_t)0,(uint8_t)0,(uint8_t)0
-        };
-
         std::vector<std::string> out;
         split_string(path, '/', out);
         std::string tile_name = out.back().substr(0, 7);
-        // std::cout << "Loading " << tile_name << "\n";
 
-        // 2. turn buffer into a sample vector
+        // 1. quick data load
+        std::vector<uint16_t> altitudes;
+        std::vector<uint8_t> buffer;
+
         float latitudeBase = std::stof(tile_name.substr(1, 2)) * (tile_name[0] == 'N' ? 1.0f : -1.0f);
         float longtitudeBase = std::stof(tile_name.substr(4, 3)) * (tile_name[3] == 'E' ? 1.0f : -1.0f);
 
@@ -128,35 +110,81 @@ namespace Engine
         LOD = this->isPermaPlane ? HGTLOD::PERFECT : LOD;
         uint32_t HGT_INT_WIDTH = 2;
 
-        double sumSoFar = 0.0;
+        if (!this->isPermaPlane) {
+            if (this->isJPG) {
+                std::cout << "loading from jpg\n";
+                int w, h, c;
+                unsigned char* data = stbi_load(path.c_str(), &w, &h, &c, 1);
+                if (!data) {
+                    throw std::runtime_error("Błąd odczytu: " + path);
+                }
+                std::vector<std::string> out0;
+                split_string(out.back().substr(0, out.back().size()-4), '_', out0);
+                int16_t h_min, h_max;
+                h_min = std::stoi(out0[1]);
+                h_max = std::stoi(out0[2]);
+                
+                float range = (float)(h_max - h_min);
 
-        assert((FILE_GRID_SIZE-1) % LOD == 0);
-
-        std::vector<int> holesToFill;
-        float properCount = 0;
-
-        // 1. first read bytes
-        std::vector<uint16_t> altitudes;
-        for (int i = 0; i<FILE_GRID_SIZE; i+=LOD) {
-            for (int j = 0; j<FILE_GRID_SIZE; j+=LOD) {
-                unsigned int buffer_offset = HGT_INT_WIDTH * FILE_GRID_SIZE * i + HGT_INT_WIDTH * j;
-                unsigned int highByte = buffer[buffer_offset];
-                unsigned int lowByte = buffer[buffer_offset+1];
-                int16_t altitude = (((uint16_t)highByte << 8) | lowByte);
-                altitudes.push_back(altitude);
+                for (int i = 0; i < w * h; i++) {
+                    float normalized = (float)data[i] / 255.0f;
+                    buffer.push_back((float)h_min + (normalized * range));
+                    // std::cout << (float)h_min + (normalized * range) << "\n";
+                }
+                for (int i = 0; i<FILE_GRID_SIZE; i+=LOD) {
+                    for (int j = 0; j<FILE_GRID_SIZE; j+=LOD) {
+                        unsigned int buffer_offset = FILE_GRID_SIZE * i + j;
+                        
+                        float normalized = (float)data[buffer_offset] / 255.0f;
+                        int16_t value = h_min + (normalized * range);
+                        
+                        altitudes.push_back(value);
+                    }
+                }
+                stbi_image_free(data);
+            } else {
+                std::ifstream file(path, std::ios::binary | std::ios::ate);
+                auto fileSize = file.tellg();
+                file.seekg(0, std::ios::beg);
+                if (fileSize > std::vector<uint8_t>().max_size()) {
+                    std::cout << "File too big?? " << fileSize << "\n";
+                    return;
+                }
+                buffer = std::vector<uint8_t>(fileSize);
+                if (!file.read(reinterpret_cast<char*>(buffer.data()), fileSize)) {
+                    throw std::runtime_error("Błąd odczytu: " + path);
+                }
+                for (int i = 0; i<FILE_GRID_SIZE; i+=LOD) {
+                    for (int j = 0; j<FILE_GRID_SIZE; j+=LOD) {
+                        unsigned int buffer_offset = HGT_INT_WIDTH * FILE_GRID_SIZE * i + HGT_INT_WIDTH * j;
+                        unsigned int highByte = buffer[buffer_offset];
+                        unsigned int lowByte = buffer[buffer_offset+1];
+                        int16_t altitude = (((uint16_t)highByte << 8) | lowByte);
+                        altitudes.push_back(altitude);
+                    }
+                }
             }
+        } else {
+            altitudes = {0,0,0,0};
         }
 
-        std::vector<uint16_t> smoothValues;
-        for (int i = 0; i<FILE_GRID_SIZE; i+=1) {
-            for (int j = 0; j<FILE_GRID_SIZE; j+=1) {
-                smoothValues.push_back(altitudes[FILE_GRID_SIZE * i + j]);
-            } 
-        }
+
+
+        // std::cout << "Loading " << tile_name << "\n";
+
+        // 2. turn buffer into a sample vector
+          
+
+        // std::vector<uint16_t> smoothValues;
+        // for (int i = 0; i<FILE_GRID_SIZE; i+=1) {
+        //     for (int j = 0; j<FILE_GRID_SIZE; j+=1) {
+        //         smoothValues.push_back(altitudes[FILE_GRID_SIZE * i + j]);
+        //     } 
+        // }
 
         for (int i = 0; i<EFFECTIVE_GRID_SIZE; i+=1) {
             for (int j = 0; j<EFFECTIVE_GRID_SIZE; j+=1) {
-                int16_t altitude = smoothValues[EFFECTIVE_GRID_SIZE * i + j];
+                int16_t altitude = altitudes[EFFECTIVE_GRID_SIZE * i + j];
 
                 float latProgress = (float)i / (float)(EFFECTIVE_GRID_SIZE - 1);
                 float latitude = (latitudeBase + 1.0f) - (latProgress * 1.0f); 
@@ -170,10 +198,6 @@ namespace Engine
                     point.y / 6371000.0f, 
                     point.z / 6371000.0f
                 });
-
-                if (altitude > -500) {
-                    sumSoFar += glm::length(point) / 6371000.0f;
-                }
 
                 // std::cout << point.x << " " << point.y << " " << point.z << ", ";
                 if (i == 0 || j == 0) continue;
@@ -231,11 +255,12 @@ namespace Engine
         if (lodJob.joinable()) lodJob.join();
     };
 
-    HGTTile* HGTTile::buildFrom(const std::string& path, HGT* parent) {
+    HGTTile* HGTTile::buildFrom(const std::string& path, HGT* parent, bool isJPG) {
         HGTTile *tile = new HGTTile(parent);
         tile->isPermaPlane = false;
         tile->path = path;
         tile->center = glm::vec3(0.0f, 0.0f, 0.0f);
+        tile->isJPG = isJPG;
         return tile;
     };
 

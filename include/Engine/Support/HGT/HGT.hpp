@@ -83,6 +83,8 @@ namespace Engine
 
         bool isPermaPlane;
 
+        bool isJPG;
+
         std::string path;
 
         int lastLOD;
@@ -107,7 +109,7 @@ namespace Engine
 
         void runGarbageCollector();
 
-        static HGTTile* buildFrom(const std::string& path, HGT* parent);
+        static HGTTile* buildFrom(const std::string& path, HGT* parent, bool isJPG);
 
         static HGTTile* buildPlaneAt(glm::ivec2 vec, HGT* parent);
 

@@ -8,6 +8,7 @@
 #include <utility>
 #include <format>
 #include <Engine/Core/Scene/Camera.hpp>
+#include <string>
 
 #define BYTE(x) std::bitset<8>(x)
 
@@ -23,8 +24,13 @@ namespace Engine
                 return nullptr;
             }
             for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                std::string full_stem = entry.path().stem();
                 if (entry.is_regular_file() && entry.path().extension() == ".hgt") {
-                    hgt->tiles[entry.path().stem()] = HGTTile::buildFrom(entry.path(), hgt);
+                    hgt->tiles[full_stem.substr(0,7)] = HGTTile::buildFrom(entry.path(), hgt, false);
+                } 
+
+                if (entry.is_regular_file() && entry.path().extension() == ".jpg") {
+                    hgt->tiles[full_stem.substr(0,7)] = HGTTile::buildFrom(entry.path(), hgt, true);
                 } 
             }
         } catch (const std::exception& e) {
@@ -116,8 +122,8 @@ namespace Engine
         float distance = context->cameraPosition.y - 100000.0f;
         float factor = 10000.0f;
 
-        int square_size_x = 1 + (int)(8.0f * distance / factor);
-        int square_size_y = 1 + 2 * (int)(8.0f * distance / factor);
+        int square_size_x = 2 + (int)(8.0f * distance / factor);
+        int square_size_y = 2 + 2 * (int)(8.0f * distance / factor);
 
 
         for (int dy = square_size_y; dy >= -square_size_y; dy--) {

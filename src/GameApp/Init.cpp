@@ -90,8 +90,8 @@ namespace GameApp
         textureRepository->loadEmptyTexture("./assets/textures/notexture.png");
 
         // load HGT
+        // Engine::HGT* hgt = Engine::HGT::fromDataSource("/mnt/d6e94da6-c1d5-4615-9695-ec204b9e3102/pgk-map/scripts/output");
         Engine::HGT* hgt = Engine::HGT::fromDataSource("/mnt/d6e94da6-c1d5-4615-9695-ec204b9e3102/pgk-map/hgt_gigant");
-        // Engine::HGT* hgt = Engine::HGT::fromDataSource("./assets/M33");
         scene->addRenderable(hgt);
         camera->set_ref("hgt", hgt);
 
