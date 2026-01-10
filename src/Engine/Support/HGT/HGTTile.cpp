@@ -43,7 +43,7 @@ namespace Engine
 
     // diviros of 1200
     std::vector<int> divisorsOf1200 = {
-        1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 25, 30, 40, 48, 50, 60, 75, 80, 100, 120, 150, 200, 240, 300, 400, 600, 1200
+        1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 25, 30, 40, 48, 50, 60, 75, 80, 100, 120, 150, 200,
     };
 
     int HGTTile::getLodFromPosition(glm::vec3 position) {
@@ -128,28 +128,39 @@ namespace Engine
         LOD = this->isPermaPlane ? HGTLOD::PERFECT : LOD;
         uint32_t HGT_INT_WIDTH = 2;
 
-        float sumSoFar = 0.0;
+        double sumSoFar = 0.0;
 
         assert((FILE_GRID_SIZE-1) % LOD == 0);
 
         std::vector<int> holesToFill;
         float properCount = 0;
 
-        // idea: we should allways take border elements
-
+        // 1. first read bytes
+        std::vector<uint16_t> altitudes;
         for (int i = 0; i<FILE_GRID_SIZE; i+=LOD) {
             for (int j = 0; j<FILE_GRID_SIZE; j+=LOD) {
                 unsigned int buffer_offset = HGT_INT_WIDTH * FILE_GRID_SIZE * i + HGT_INT_WIDTH * j;
                 unsigned int highByte = buffer[buffer_offset];
                 unsigned int lowByte = buffer[buffer_offset+1];
-
                 int16_t altitude = (((uint16_t)highByte << 8) | lowByte);
+                altitudes.push_back(altitude);
+            }
+        }
 
-                sumSoFar += (float)altitude;
+        std::vector<uint16_t> smoothValues;
+        for (int i = 0; i<FILE_GRID_SIZE; i+=1) {
+            for (int j = 0; j<FILE_GRID_SIZE; j+=1) {
+                smoothValues.push_back(altitudes[FILE_GRID_SIZE * i + j]);
+            } 
+        }
 
-                float latProgress = (float)i / (float)(FILE_GRID_SIZE - 1);
+        for (int i = 0; i<EFFECTIVE_GRID_SIZE; i+=1) {
+            for (int j = 0; j<EFFECTIVE_GRID_SIZE; j+=1) {
+                int16_t altitude = smoothValues[EFFECTIVE_GRID_SIZE * i + j];
+
+                float latProgress = (float)i / (float)(EFFECTIVE_GRID_SIZE - 1);
                 float latitude = (latitudeBase + 1.0f) - (latProgress * 1.0f); 
-                float lonProgress = (float)j / (float)(FILE_GRID_SIZE - 1);
+                float lonProgress = (float)j / (float)(EFFECTIVE_GRID_SIZE - 1);
                 float longitude = longtitudeBase + (lonProgress * 1.0f);
 
                 auto point = Math::angleToEarthPoint(latitude, altitude, longitude);
@@ -159,6 +170,10 @@ namespace Engine
                     point.y / 6371000.0f, 
                     point.z / 6371000.0f
                 });
+
+                if (altitude > -500) {
+                    sumSoFar += glm::length(point) / 6371000.0f;
+                }
 
                 // std::cout << point.x << " " << point.y << " " << point.z << ", ";
                 if (i == 0 || j == 0) continue;
@@ -174,16 +189,6 @@ namespace Engine
                 });
             }
         }
-
-        // flatten the result depending on LOD
-
-        for (int i = 0; i<vertices_buffer.size(); i+=3) {
-            float average = sumSoFar / ((float)vertices_buffer.size() / 3.0f);
-            float t = (float)LOD / 1200.0; // how strong should we flatten
-            vertices_buffer[i+1] = glm::mix(vertices_buffer[i+1], average, t);
-        }
-
-        std::cout << "Holes to fill: " << holesToFill.size() << "\n";
         
         this->center = (glm::vec3(vertices_buffer[0], vertices_buffer[1], vertices_buffer[2]) 
             + glm::vec3(vertices_buffer[vertices_buffer.size()-3], vertices_buffer[vertices_buffer.size()-2], vertices_buffer[vertices_buffer.size()-1])) / 2.0f;
