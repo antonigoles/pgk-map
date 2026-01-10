@@ -1,8 +1,7 @@
-// main.cpp
 #include <GameApp/Init.hpp>
 #include <string>
 #include <iostream>
-\
+
 int main(int argc, char *argv[])
 {
     float longtitude = 50.86501694f;
