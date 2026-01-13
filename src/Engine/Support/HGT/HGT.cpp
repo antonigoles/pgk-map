@@ -64,7 +64,7 @@ namespace Engine
         static int32_t last = 0;
         static std::unordered_map<HGTTile*, int32_t> ptr;
         if (ptr.contains(tile)) return ptr[tile];
-        last = (last + 1) % 64;
+        last = (last + 1) % 8;
         ptr[tile] = last;
         return last;
     }
@@ -119,11 +119,11 @@ namespace Engine
         std::vector<glm::ivec2> nbrs = {};
 
         // generate tiles to draw
-        float distance = context->cameraPosition.y - 100000.0f;
+        float distance = std::max(0.0f, context->cameraPosition.y - 100000.0f);
         float factor = 10000.0f;
 
-        int square_size_x = 2 + (int)(8.0f * distance / factor);
-        int square_size_y = 2 + 2 * (int)(8.0f * distance / factor);
+        int square_size_x = 1 + (int)(8.0f * distance / factor);
+        int square_size_y = 1 + 2 * (int)(8.0f * distance / factor);
 
 
         for (int dy = square_size_y; dy >= -square_size_y; dy--) {

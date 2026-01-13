@@ -91,7 +91,8 @@ namespace GameApp
 
         // load HGT
         // Engine::HGT* hgt = Engine::HGT::fromDataSource("/mnt/d6e94da6-c1d5-4615-9695-ec204b9e3102/pgk-map/scripts/output");
-        Engine::HGT* hgt = Engine::HGT::fromDataSource("/mnt/d6e94da6-c1d5-4615-9695-ec204b9e3102/pgk-map/hgt_gigant");
+        // Engine::HGT* hgt = Engine::HGT::fromDataSource("/mnt/d6e94da6-c1d5-4615-9695-ec204b9e3102/pgk-map/hgt_gigant");
+            Engine::HGT* hgt = Engine::HGT::fromDataSource("./assets/M33");
         scene->addRenderable(hgt);
         camera->set_ref("hgt", hgt);
 
@@ -124,11 +125,6 @@ namespace GameApp
             .isTransparent = false,
             .hasGeometryShader = false,
         });
-
-        auto girlMesh = meshRepository->loadMeshFromOBJFile("./assets/meshes/large/sphere.obj", textureRepository);
-        auto [cloud1, _2] = gameObjectRepository->createGameObject(girlMesh, cloudShader);
-        cloud1->transform.setPosition({0.0f, 0.0f, 0.0f});
-        cloud1->transform.setScale(1.0f);
 
         // camera->syncCameraAndTarget(hgt->transform);
         scene->setFlag(Engine::SCENE_FLAGS::RENDER_DEBUG_UI);
